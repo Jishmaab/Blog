@@ -1,28 +1,33 @@
 from datetime import timedelta
 
+from asgiref.sync import async_to_sync
+from channels.layers import get_channel_layer
 from django.contrib.auth import authenticate, update_session_auth_hash
 from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
+from django.shortcuts import render
 from django.utils import timezone
-from rest_framework import viewsets,generics,filters
+from rest_framework import filters, generics, viewsets
 from rest_framework.authtoken.models import Token
+from rest_framework.decorators import action
 from rest_framework.exceptions import AuthenticationFailed
+from rest_framework.filters import OrderingFilter, SearchFilter
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from rest_framework.decorators import action
 from rest_framework_api_key.permissions import HasAPIKey
-from rest_framework.filters import SearchFilter,OrderingFilter
 
 from permissions.permission import (IsAdminOrReadOnly, IsAdminUser,
                                     IsOwnerOrReadOnly)
 from utils.exceptions import CustomException, fail, success
 
-from .models import Comment, Post, User,Category,Tag
-from .serializers import (ChangePasswordSerializer, CommentSerializer,
-                          PostSerializer, UserSerializer,DraftPostSerializer,CategorySerializer,TagSerializer)
+from .models import Category, Comment, Like, Post, Tag, User
+from .serializers import (CategorySerializer, ChangePasswordSerializer,
+                          CommentSerializer, DraftPostSerializer,
+                          LikeSerializer, PostSerializer, TagSerializer,
+                          UserSerializer)
 
 
 class SignupView(APIView):
@@ -109,7 +114,7 @@ class ChangePasswordAPIView(APIView):
 class CommentViewSet(viewsets.ModelViewSet):
     queryset = Comment.objects.all()
     serializer_class = CommentSerializer
-    permission_classes = [IsAuthenticated, IsAdminOrReadOnly]
+    permission_classes = [IsAuthenticated]
     pagination_class = PageNumberPagination
 
     def perform_create(self, serializer):
@@ -119,13 +124,12 @@ class CommentViewSet(viewsets.ModelViewSet):
 class PostViewSet(viewsets.ModelViewSet):
     queryset = Post.objects.all().order_by('-created_at')
     serializer_class = PostSerializer
-    # pagination_class = PageNumberPagination
+    pagination_class = PageNumberPagination
     # permission_classes = [IsAuthenticated, IsAdminUser, IsOwnerOrReadOnly]
 
     def perform_create(self, serializer):
         serializer.save(author=self.request.user)
 
-    
     def get_serializer_class(self):
         if self.action == 'create' or self.action == 'update':
             return DraftPostSerializer
@@ -148,7 +152,8 @@ class PostViewSet(viewsets.ModelViewSet):
             instance.save()
             return Response(success({'message': 'Post archived successfully'}))
 
-        return super().delete(request, *args, **kwargs)    
+        return super().delete(request, *args, **kwargs)
+
 
 class UserViewSet(viewsets.ModelViewSet):
     queryset = User.objects.all()
@@ -156,23 +161,50 @@ class UserViewSet(viewsets.ModelViewSet):
     pagination_class = PageNumberPagination
     permission_classes = [IsAuthenticated, IsAdminOrReadOnly]
 
+
 class PostListView(generics.ListAPIView):
     queryset = Post.objects.all()
     serializer_class = PostSerializer
-    filter_backends = [SearchFilter,OrderingFilter]
+    filter_backends = [SearchFilter, OrderingFilter]
     search_fields = ['title', 'content', 'tags']
-    ordering_fields = ['created_at', 'category', 'author']  
-    pagination_class = PageNumberPagination  
-    permission_classes = [IsAuthenticated,HasAPIKey]
+    ordering_fields = ['created_at', 'category', 'author']
+    pagination_class = PageNumberPagination
+    permission_classes = [IsAuthenticated, HasAPIKey]
+
 
 class CategoryViewSet(viewsets.ModelViewSet):
     queryset = Category.objects.all()
     serializer_class = CategorySerializer
     pagination_class = PageNumberPagination
-    # permission_classes = [IsAuthenticated, HasAPIKey]    
+    permission_classes = [IsAuthenticated, HasAPIKey]
+
 
 class TagViewSet(viewsets.ModelViewSet):
     queryset = Tag.objects.all()
     serializer_class = TagSerializer
     pagination_class = PageNumberPagination
-    # permission_classes = [IsAuthenticated, HasAPIKey]       
+    permission_classes = [IsAuthenticated, HasAPIKey]
+
+
+class LikeViewSet(viewsets.ModelViewSet):
+    queryset = Like.objects.all()
+    serializer_class = LikeSerializer
+    permission_classes = [IsAuthenticated]
+
+    def perform_create(self, serializer):
+        serializer.save(author=self.request.user)
+
+
+def handle_like(request, post_id):
+     channel_layer = get_channel_layer()
+     async_to_sync(channel_layer.group_send)(
+        f"post_{post_id}",
+        {
+            'type': 'send_notification',
+            'message': 'Someone liked your post!',
+        }
+    )
+
+
+def index(request):
+    return render(request, 'index.html')

@@ -69,3 +69,8 @@ class DraftPostSerializer(serializers.ModelSerializer):
     class Meta:
         model = Post
         fields = ['title', 'content', 'image', 'tags', 'category', 'status']
+
+class LikeSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Like
+        fields = '__all__'        

@@ -9,6 +9,7 @@ router.register(r'comment', views.CommentViewSet, basename='comment'),
 router.register(r'user', views.UserViewSet, basename='user'),
 router.register(r'category', views.CategoryViewSet, basename='category'),
 router.register(r'tag', views.TagViewSet, basename='tag'),
+router.register(r'likes', views.LikeViewSet, basename='like')
 
 urlpatterns = [
     path('signup/', views.SignupView.as_view(), name='signup'),

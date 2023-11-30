@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebSocket Demo</title>
+</head>
+
+<body>
+    <h1>WebSocket Demo</h1>
+    <div id="notifications"></div>
+
+    <script>
+        const socket = new WebSocket('ws://' + window.location.host + '/ws/notifications/'); 
+        socket.onmessage = (event) => {
+            const data = JSON.parse(event.data);
+            document.getElementById('notifications').innerHTML += `<p>${data.message}</p>`;
+        };
+    </script>
+    
+</body>
+
+</html>

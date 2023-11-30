@@ -11,7 +11,7 @@ class User(AbstractUser):
         upload_to='profile_pictures/', null=True, blank=True)
     bio = models.CharField(max_length=35, null=True, blank=True)
 
-    def __str__(self):
+    def __str__(self) -> str:
         return self.username
 
     class Meta:
@@ -21,12 +21,18 @@ class User(AbstractUser):
 class Tag(models.Model):
     name = models.CharField(max_length=255, unique=True)
 
+    def __str__(self) -> str:
+        return self.name
+
     class Meta:
         db_table = 'tag'
 
 
 class Category(models.Model):
     name = models.CharField(max_length=255, unique=True)
+
+    def __str__(self) -> str:
+        return self.name
 
     class Meta:
         db_table = 'category'
@@ -46,6 +52,9 @@ class Post(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     status = models.IntegerField(choices=StatusChoices.choices, default=1)
 
+    def __str__(self) -> str:
+        return self.title
+
     class Meta:
         db_table = 'post'
 
@@ -55,6 +64,9 @@ class Comment(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     author = models.ForeignKey(User, on_delete=models.CASCADE)
     post = models.ForeignKey(Post, on_delete=models.CASCADE)
+
+    def __str__(self) -> str:
+        return self.content
 
     class Meta:
         db_table = 'comment'
@@ -67,6 +79,9 @@ class Replay(models.Model):
     post = models.ForeignKey(Post, on_delete=models.CASCADE)
     comment = models.ForeignKey(Comment, on_delete=models.CASCADE)
 
+    def __str__(self) -> str:
+        return self.comment
+
     class Meta:
         db_table = 'replay'
 
@@ -75,16 +90,21 @@ class Like(models.Model):
     author = models.ForeignKey(User, on_delete=models.CASCADE)
     post = models.ForeignKey(Post, on_delete=models.CASCADE)
 
+    def __str__(self) -> str:
+        return self.post
+
     class Meta:
         db_table = 'like'
 
 
 class Notification(models.Model):
-    id = models.AutoField(primary_key=True)
     recipient = models.ForeignKey(User, on_delete=models.CASCADE)
     message = models.TextField()
     created_at = models.DateTimeField(auto_now_add=True)
     is_read = models.BooleanField(default=False)
+
+    def __str__(self) -> str:
+        return self.recipient
 
     class Meta:
         db_table = 'notification'
