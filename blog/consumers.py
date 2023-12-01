@@ -3,6 +3,7 @@ import json
 
 class NotificationConsumer(AsyncWebsocketConsumer):
     async def connect(self):
+        print("WebSocket connected")
         post_id = self.scope['url_route']['kwargs']['post_id']
         self.post_group_name = f"post_{post_id}"
 
@@ -10,10 +11,11 @@ class NotificationConsumer(AsyncWebsocketConsumer):
             self.post_group_name,
             self.channel_name
         )
-
+        
         await self.accept()
 
     async def disconnect(self, close_code):
+        print("WebSocket disconnected")
         await self.channel_layer.group_discard(
             self.post_group_name,
             self.channel_name

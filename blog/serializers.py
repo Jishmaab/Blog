@@ -9,11 +9,12 @@ from .models import *
 class UserSerializer(serializers.ModelSerializer):
     profile_picture = serializers.FileField()
     password = PasswordField(write_only=True, required=True)
+    published_posts = serializers.SerializerMethodField()
 
     class Meta:
         model = User
         fields = ['username', 'email', 'password', 'first_name',
-                  'last_name', 'user_type', 'profile_picture', 'bio']
+                  'last_name', 'user_type', 'profile_picture', 'bio','published_posts']
         extra_kwargs = {'password': {'write_only': True}}
 
     def create(self, validated_data):
@@ -24,11 +25,19 @@ class UserSerializer(serializers.ModelSerializer):
             last_name=validated_data.get('last_name'),
             user_type=validated_data.get('user_type'),
             profile_picture=validated_data.get('profile_picture'),
-            bio=validated_data.get('bio')
+            bio=validated_data.get('bio'),
+            published_posts = validated_data.get('published_posts')
+
         )
         user.set_password(validated_data.get('password'))
         user.save()
         return user
+    
+    def get_published_posts(self, user):
+        posts = Post.objects.filter(author=user, status=Post.StatusChoices.Published)
+        post_serializer = PostSerializer(posts, many=True)
+        return post_serializer.data
+    
 
 
 class ChangePasswordSerializer(serializers.Serializer):
@@ -73,4 +82,10 @@ class DraftPostSerializer(serializers.ModelSerializer):
 class LikeSerializer(serializers.ModelSerializer):
     class Meta:
         model = Like
-        fields = '__all__'        
+        fields = '__all__'    
+            
+class BioUpdateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ['bio']
+        

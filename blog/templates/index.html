@@ -12,12 +12,14 @@
     <div id="notifications"></div>
 
     <script>
-        const socket = new WebSocket('ws://' + window.location.host + '/ws/notifications/'); 
+        const socket = new WebSocket('ws://' + window.location.host + '/ws/notifications/1/');
         socket.onmessage = (event) => {
             const data = JSON.parse(event.data);
             document.getElementById('notifications').innerHTML += `<p>${data.message}</p>`;
         };
     </script>
+    
+    
     
 </body>
 

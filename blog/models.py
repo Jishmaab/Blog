@@ -60,16 +60,16 @@ class Post(models.Model):
 
 
 class Comment(models.Model):
-    content = models.TextField()
+    content =  models.CharField(max_length=35, null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     author = models.ForeignKey(User, on_delete=models.CASCADE)
     post = models.ForeignKey(Post, on_delete=models.CASCADE)
 
-    def __str__(self) -> str:
-        return self.content
+    # def __str__(self) -> str:
+    #     return self.content
 
     class Meta:
-        db_table = 'comment'
+        db_table = 'content'
 
 
 class Replay(models.Model):
@@ -95,6 +95,7 @@ class Like(models.Model):
 
     class Meta:
         db_table = 'like'
+        unique_together = ['author', 'post']
 
 
 class Notification(models.Model):

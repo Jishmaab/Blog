@@ -9,7 +9,7 @@ router.register(r'comment', views.CommentViewSet, basename='comment'),
 router.register(r'user', views.UserViewSet, basename='user'),
 router.register(r'category', views.CategoryViewSet, basename='category'),
 router.register(r'tag', views.TagViewSet, basename='tag'),
-router.register(r'likes', views.LikeViewSet, basename='like')
+router.register(r'likes', views.LikeViewSet, basename='like'),
 
 urlpatterns = [
     path('signup/', views.SignupView.as_view(), name='signup'),
@@ -18,5 +18,7 @@ urlpatterns = [
     path('change-password/', views.ChangePasswordAPIView.as_view(),
          name='change-password'),
     path('postlist/', views.PostListView.as_view(), name='post-list'),
+    path('userprofile/<int:user_id>/', views.UserProfileAPIView.as_view(), name='user-profile'),
+    path('bio-update/', views.BioUpdateView.as_view(), name='bio-update'),
 
 ] + router.urls

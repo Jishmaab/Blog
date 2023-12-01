@@ -5,6 +5,7 @@ from channels.layers import get_channel_layer
 from django.contrib.auth import authenticate, update_session_auth_hash
 from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
+from django.http import HttpResponse
 from django.shortcuts import render
 from django.utils import timezone
 from rest_framework import filters, generics, viewsets
@@ -27,7 +28,7 @@ from .models import Category, Comment, Like, Post, Tag, User
 from .serializers import (CategorySerializer, ChangePasswordSerializer,
                           CommentSerializer, DraftPostSerializer,
                           LikeSerializer, PostSerializer, TagSerializer,
-                          UserSerializer)
+                          UserSerializer,BioUpdateSerializer)
 
 
 class SignupView(APIView):
@@ -106,7 +107,7 @@ class ChangePasswordAPIView(APIView):
                 user.set_password(serializer.data.get('new_password'))
                 user.save()
                 update_session_auth_hash(request, user)
-                return Response(success({'message': 'Password changed successfully.'}))
+                return Response(success('Password changed successfully.'))
             return Response(fail({'error': 'Incorrect old password.'}))
         return Response(success())
 
@@ -140,7 +141,7 @@ class PostViewSet(viewsets.ModelViewSet):
         post = self.get_object()
         post.status = Post.StatusChoices.Published
         post.save()
-        return Response(success({'message': 'Post published successfully'}))
+        return Response(success('Post published successfully'))
 
     def perform_create(self, serializer):
         serializer.save(author=self.request.user, created_at=timezone.now())
@@ -150,7 +151,7 @@ class PostViewSet(viewsets.ModelViewSet):
         if instance.status == Post.StatusChoices.Published:
             instance.status = Post.StatusChoices.Draft
             instance.save()
-            return Response(success({'message': 'Post archived successfully'}))
+            return Response(success('Post archived successfully'))
 
         return super().delete(request, *args, **kwargs)
 
@@ -193,18 +194,45 @@ class LikeViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         serializer.save(author=self.request.user)
+        handle_like(self.request, serializer.instance.post.id)
+        return HttpResponse(status=201)
 
 
 def handle_like(request, post_id):
-     channel_layer = get_channel_layer()
-     async_to_sync(channel_layer.group_send)(
+    channel_layer = get_channel_layer()
+    message = 'Someone liked your post!'
+    print(message)
+    async_to_sync(channel_layer.group_send)(
         f"post_{post_id}",
         {
             'type': 'send_notification',
-            'message': 'Someone liked your post!',
+            'message': message,
         }
     )
 
 
 def index(request):
     return render(request, 'index.html')
+
+class UserProfileAPIView(APIView):
+    def get(self, request, user_id):
+        try:
+            user = User.objects.get(pk=user_id)
+        except User.DoesNotExist:
+            return Response(fail( 'User not found'))
+
+        serializer = UserSerializer(user)
+        return Response(serializer.data)
+    
+class BioUpdateView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def patch(self, request, *args, **kwargs):
+        user = self.request.user
+        serializer = BioUpdateSerializer(user, data=request.data, partial=True)
+
+        if serializer.is_valid():
+            serializer.save()
+            return Response(success('Bio updated successfully'))
+        else:
+            return Response(fail())    
