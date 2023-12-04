@@ -54,6 +54,7 @@ class SignupView(APIView):
         raise CustomException(serializer.errors)
 
 
+
 class LoginView(APIView):
     def post(self, request, format=None):
         try:
@@ -224,6 +225,7 @@ class UserProfileAPIView(APIView):
 
         serializer = UserSerializer(user)
         return Response(serializer.data)
+
 
 
 class BioUpdateView(APIView):

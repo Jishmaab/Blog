@@ -13,8 +13,8 @@ class UserSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ['username', 'email', 'password', 'first_name',
-                  'last_name', 'user_type', 'profile_picture', 'bio', 'published_posts']
+        fields = ['username', 'email', 'password', 'first_name', 'last_name',
+                  'user_type', 'profile_picture', 'bio', 'published_posts']
         extra_kwargs = {'password': {'write_only': True}}
 
     def create(self, validated_data):
@@ -23,11 +23,8 @@ class UserSerializer(serializers.ModelSerializer):
             email=validated_data.get('email'),
             first_name=validated_data.get('first_name'),
             last_name=validated_data.get('last_name'),
-            user_type=validated_data.get('user_type'),
             profile_picture=validated_data.get('profile_picture'),
-            bio=validated_data.get('bio'),
-            published_posts=validated_data.get('published_posts')
-
+            bio=validated_data.get('bio')
         )
         user.set_password(validated_data.get('password'))
         user.save()
@@ -38,6 +35,12 @@ class UserSerializer(serializers.ModelSerializer):
             author=user, status=Post.StatusChoices.Published)
         post_serializer = PostSerializer(posts, many=True)
         return post_serializer.data
+
+    def to_representation(self, instance):
+        is_signup = 'request' in self.context and 'signup' in self.context['request'].path_info
+        if is_signup:
+            self.fields.pop('published_posts')
+        return super().to_representation(instance)
 
 
 class ChangePasswordSerializer(serializers.Serializer):
