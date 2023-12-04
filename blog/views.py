@@ -3,8 +3,10 @@ from datetime import timedelta
 from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
 from django.contrib.auth import authenticate, update_session_auth_hash
-from django.core.exceptions import ValidationError
+from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.core.validators import validate_email
+from django.forms import ValidationError
 from django.http import HttpResponse
 from django.shortcuts import render
 from django.utils import timezone
@@ -20,68 +22,46 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_api_key.permissions import HasAPIKey
 
-from permissions.permission import (IsAdminOrReadOnly, IsAdminUser,
-                                    IsOwnerOrReadOnly)
-from utils.exceptions import CustomException, fail, success
+from permissions.permission import IsAdminOrReadOnly
+from utils.custompassword import PasswordValidator
+from utils.exceptions import custom_exception_handler, fail, success
 
 from .models import Category, Comment, Like, Post, Tag, User
 from .serializers import (BioUpdateSerializer, CategorySerializer,
                           ChangePasswordSerializer, CommentSerializer,
-                          DraftPostSerializer, LikeSerializer, PostSerializer,
-                          TagSerializer, UserSerializer)
+                          DraftPostSerializer, LikeSerializer, LoginSerializer,
+                          PostSerializer, TagSerializer, UserSerializer)
 
 
 class SignupView(APIView):
     def post(self, request, format=None):
         serializer = UserSerializer(data=request.data)
-        if serializer.is_valid():
-            username = serializer.validated_data['username']
-            email = serializer.validated_data['email']
-            password = serializer.validated_data['password']
-            try:
-                validate_email(email)
-            except ValidationError as email_error:
-                raise CustomException(
-                    {"status": "Invalid email format", "detail": email_error.detail})
-
-            if User.objects.filter(username=username).exists() or User.objects.filter(email=email).exists():
-                raise CustomException(
-                    {"status": "Username or email already in use"})
-            user = serializer.create(serializer.validated_data)
-            serializer = UserSerializer(user, context={'request': request})
-            return Response(
-                success(serializer.data),)
-        raise CustomException(serializer.errors)
-
+        serializer.is_valid(raise_exception=True)
+        user = serializer.create(serializer.validated_data)
+        serializer = UserSerializer(user, context={'request': request})
+        return Response(success(serializer.data))
 
 
 class LoginView(APIView):
     def post(self, request, format=None):
-        try:
-            username = request.data.get('username')
-            password = request.data.get('password')
-            user = authenticate(username=username, password=password)
-
-            if user is not None:
-                token, created = Token.objects.get_or_create(user=user)
-                expiration_date = token.created + timedelta(days=1)
-
-                if expiration_date <= timezone.now():
-                    token.delete()
-                    token = Token.objects.create(user=user)
-
-                user_serializer = UserSerializer(user)
-
-                response_data = {
-                    "token": token.key,
-                    "user": user_serializer.data,
-                }
-                return Response(success(response_data))
-
-            raise AuthenticationFailed("Invalid username or password")
-
-        except Exception as e:
-            raise CustomException(str(e))
+        serializer = LoginSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        username = request.data.get('username')
+        password = request.data.get('password')
+        user = authenticate(username=username, password=password)
+        if user is not None:
+            token, created = Token.objects.get_or_create(user=user)
+            expiration_date = token.created + timedelta(days=1)
+            if expiration_date <= timezone.now():
+                token.delete()
+                token = Token.objects.create(user=user)
+            user_serializer = UserSerializer(user)
+            data = {
+                "token": token.key,
+                "user": user_serializer.data,
+            }
+            return Response(success(data))
+        raise AuthenticationFailed("Invalid password")
 
 
 class LogoutView(APIView):
@@ -94,7 +74,7 @@ class LogoutView(APIView):
             return Response(
                 success("Logged out successfully"))
         except Exception as e:
-            raise CustomException(str(e))
+            raise custom_exception_handler(str(e))
 
 
 class ChangePasswordAPIView(APIView):
@@ -104,13 +84,26 @@ class ChangePasswordAPIView(APIView):
         serializer = ChangePasswordSerializer(data=request.data)
         if serializer.is_valid():
             user = request.user
-            if user.check_password(serializer.data.get('old_password')):
-                user.set_password(serializer.data.get('new_password'))
+            old_password = serializer.validated_data.get('old_password')
+            new_password = serializer.validated_data.get('new_password')
+            if old_password == new_password:
+                return Response(fail('New password must be different from the old password.'))
+            try:
+                PasswordValidator()(new_password)
+            except ValidationError as e:
+                return Response(fail(str(e)))
+            try:
+                validate_password(new_password, user=user)
+            except DjangoValidationError as e:
+                return Response(fail(e.messages))
+
+            if user.check_password(old_password):
+                user.set_password(new_password)
                 user.save()
                 update_session_auth_hash(request, user)
                 return Response(success('Password changed successfully.'))
-            return Response(fail({'error': 'Incorrect old password.'}))
-        return Response(success())
+            return Response(fail('Incorrect old password.'))
+        return Response(fail(serializer.errors))
 
 
 class CommentViewSet(viewsets.ModelViewSet):
@@ -127,10 +120,13 @@ class PostViewSet(viewsets.ModelViewSet):
     queryset = Post.objects.all().order_by('-created_at')
     serializer_class = PostSerializer
     pagination_class = PageNumberPagination
-    # permission_classes = [IsAuthenticated, IsAdminUser, IsOwnerOrReadOnly]
+    permission_classes = [IsAuthenticated]
 
     def perform_create(self, serializer):
         serializer.save(author=self.request.user)
+
+    def get_queryset(self):
+        return Post.objects.filter(author=self.request.user)
 
     def get_serializer_class(self):
         if self.action == 'create' or self.action == 'update':
@@ -188,15 +184,40 @@ class TagViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated, HasAPIKey]
 
 
-class LikeViewSet(viewsets.ModelViewSet):
-    queryset = Like.objects.all()
-    serializer_class = LikeSerializer
+class LikeAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
-    def perform_create(self, serializer):
-        serializer.save(author=self.request.user)
-        handle_like(self.request, serializer.instance.post.id)
-        return HttpResponse(status=201)
+    def get(self, request, *args, **kwargs):
+        post_id = self.kwargs.get('post_id')
+        user_id = self.kwargs.get('user_id')
+
+        if post_id:
+            likes = Like.objects.filter(post_id=post_id)
+        elif user_id:
+            likes = Like.objects.filter(author_id=user_id)
+        else:
+            likes = Like.objects.all()
+
+        serializer = LikeSerializer(likes, many=True)
+        return Response(serializer.data)
+
+    def post(self, request, *args, **kwargs):
+        serializer = LikeSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save(author=request.user)
+            handle_like(request, serializer.instance.post.id)
+            return HttpResponse(success())
+        return Response(fail())
+
+    def delete(self, request, *args, **kwargs):
+        like_id = kwargs.get('pk')
+        try:
+            like = Like.objects.get(id=like_id, author=request.user)
+            post_id = like.post.id
+            like.delete()
+            return HttpResponse(fail({'error':"deleted"}))
+        except Like.DoesNotExist:
+            return HttpResponse(fail())
 
 
 def handle_like(request, post_id):
@@ -227,16 +248,12 @@ class UserProfileAPIView(APIView):
         return Response(serializer.data)
 
 
-
 class BioUpdateView(APIView):
     permission_classes = [IsAuthenticated]
 
     def patch(self, request, *args, **kwargs):
         user = self.request.user
         serializer = BioUpdateSerializer(user, data=request.data, partial=True)
-
-        if serializer.is_valid():
-            serializer.save()
-            return Response(success('Bio updated successfully'))
-        else:
-            return Response(fail())
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(success('Bio updated successfully'))

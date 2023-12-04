@@ -1,4 +1,3 @@
-from django.contrib.auth.forms import PasswordResetForm
 from rest_framework import serializers
 
 from utils.custompassword import PasswordField
@@ -11,23 +10,30 @@ class UserSerializer(serializers.ModelSerializer):
     password = PasswordField(write_only=True, required=True)
     published_posts = serializers.SerializerMethodField()
 
+    def validate_email(self, value):
+        if User.objects.filter(email=value).exists():
+            raise serializers.ValidationError(
+                'Email already exists with another user')
+        return value
+
     class Meta:
         model = User
-        fields = ['username', 'email', 'password', 'first_name', 'last_name',
-                  'user_type', 'profile_picture', 'bio', 'published_posts']
+        fields = [
+            'username', 'email', 'password', 'first_name', 'last_name',
+            'user_type', 'profile_picture', 'bio', 'published_posts'
+        ]
         extra_kwargs = {'password': {'write_only': True}}
 
     def create(self, validated_data):
-        user = User(
+        user = User.objects.create_user(
             username=validated_data.get('username'),
             email=validated_data.get('email'),
             first_name=validated_data.get('first_name'),
             last_name=validated_data.get('last_name'),
             profile_picture=validated_data.get('profile_picture'),
-            bio=validated_data.get('bio')
+            bio=validated_data.get('bio'),
+            password=validated_data.get('password')
         )
-        user.set_password(validated_data.get('password'))
-        user.save()
         return user
 
     def get_published_posts(self, user):
@@ -44,8 +50,8 @@ class UserSerializer(serializers.ModelSerializer):
 
 
 class ChangePasswordSerializer(serializers.Serializer):
-    old_password = serializers.CharField(required=True)
-    new_password = serializers.CharField(required=True)
+    old_password = PasswordField(write_only=True, required=True)
+    new_password = PasswordField(write_only=True, required=True)
 
 
 class TagSerializer(serializers.ModelSerializer):
@@ -88,9 +94,20 @@ class LikeSerializer(serializers.ModelSerializer):
     class Meta:
         model = Like
         fields = '__all__'
+        read_only_fields = ('author',)
 
 
 class BioUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ['bio']
+
+
+class LoginSerializer(serializers.Serializer):
+    username = serializers.CharField()
+    password = serializers.CharField()
+
+    def validate_username(self, value: str) -> str:
+        if User.objects.filter(username=value).exists():
+            return value
+        raise serializers.ValidationError('Invalid username')
