@@ -1,3 +1,4 @@
+import blog.routing
 import os
 
 from channels.auth import AuthMiddlewareStack
@@ -10,7 +11,6 @@ from blog.routing import websocket_urlpatterns
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "root.settings")
 django_asgi_app = get_asgi_application()
 
-import blog.routing
 
 application = ProtocolTypeRouter(
     {

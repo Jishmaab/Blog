@@ -1,5 +1,7 @@
-from channels.generic.websocket import AsyncWebsocketConsumer
 import json
+
+from channels.generic.websocket import AsyncWebsocketConsumer
+
 
 class NotificationConsumer(AsyncWebsocketConsumer):
     async def connect(self):
@@ -11,7 +13,7 @@ class NotificationConsumer(AsyncWebsocketConsumer):
             self.post_group_name,
             self.channel_name
         )
-        
+
         await self.accept()
 
     async def disconnect(self, close_code):

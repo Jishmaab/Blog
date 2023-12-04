@@ -18,7 +18,8 @@ urlpatterns = [
     path('change-password/', views.ChangePasswordAPIView.as_view(),
          name='change-password'),
     path('postlist/', views.PostListView.as_view(), name='post-list'),
-    path('userprofile/<int:user_id>/', views.UserProfileAPIView.as_view(), name='user-profile'),
+    path('userprofile/<int:user_id>/',
+         views.UserProfileAPIView.as_view(), name='user-profile'),
     path('bio-update/', views.BioUpdateView.as_view(), name='bio-update'),
 
 ] + router.urls

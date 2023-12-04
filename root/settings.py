@@ -10,9 +10,9 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/4.2/ref/settings/
 """
 
-from os.path import join
 import os
 from datetime import timedelta
+from os.path import join
 from pathlib import Path
 
 import environ
@@ -196,7 +196,7 @@ REST_FRAMEWORK = {
     'ALLOWED_VERSIONS': ['1.0', '2.0', '3.0', '3.14'],
     'DEFAULT_VERSION': '1.0',
     "DEFAULT_PERMISSION_CLASSES": [
-        # "rest_framework_api_key.permissions.HasAPIKey",
+        "rest_framework_api_key.permissions.HasAPIKey",
     ]
 }
 
@@ -252,5 +252,3 @@ CHANNEL_LAYERS = {
         },
     },
 }
-
-

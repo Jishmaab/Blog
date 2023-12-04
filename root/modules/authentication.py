@@ -14,7 +14,6 @@ def is_token_expired(token):
     return expiration_time < timezone.now()
 
 
-
 class ExpiringTokenAuthentication(TokenAuthentication):
     def authenticate_credentials(self, key):
         print(True)
