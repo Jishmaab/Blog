@@ -25,10 +25,10 @@ from permissions.permission import (IsAdminOrReadOnly, IsAdminUser,
 from utils.exceptions import CustomException, fail, success
 
 from .models import Category, Comment, Like, Post, Tag, User
-from .serializers import (CategorySerializer, ChangePasswordSerializer,
-                          CommentSerializer, DraftPostSerializer,
-                          LikeSerializer, PostSerializer, TagSerializer,
-                          UserSerializer,BioUpdateSerializer)
+from .serializers import (BioUpdateSerializer, CategorySerializer,
+                          ChangePasswordSerializer, CommentSerializer,
+                          DraftPostSerializer, LikeSerializer, PostSerializer,
+                          TagSerializer, UserSerializer)
 
 
 class SignupView(APIView):
@@ -167,7 +167,7 @@ class PostListView(generics.ListAPIView):
     queryset = Post.objects.all()
     serializer_class = PostSerializer
     filter_backends = [SearchFilter, OrderingFilter]
-    search_fields = ['title', 'content', 'tags']
+    search_fields = ['title', 'content', 'tags__name']
     ordering_fields = ['created_at', 'category', 'author']
     pagination_class = PageNumberPagination
     permission_classes = [IsAuthenticated, HasAPIKey]
@@ -214,16 +214,18 @@ def handle_like(request, post_id):
 def index(request):
     return render(request, 'index.html')
 
+
 class UserProfileAPIView(APIView):
     def get(self, request, user_id):
         try:
             user = User.objects.get(pk=user_id)
         except User.DoesNotExist:
-            return Response(fail( 'User not found'))
+            return Response(fail('User not found'))
 
         serializer = UserSerializer(user)
         return Response(serializer.data)
-    
+
+
 class BioUpdateView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -235,4 +237,4 @@ class BioUpdateView(APIView):
             serializer.save()
             return Response(success('Bio updated successfully'))
         else:
-            return Response(fail())    
+            return Response(fail())
