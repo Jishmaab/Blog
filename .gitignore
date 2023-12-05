@@ -1,12 +1,7 @@
 *.pyc
-# */migrations/
 !**/migrations/_init_.py
 .env
-# logs/
-*/log
+logs/
 media
 env/
-logs.log
-
-
-**migrations/*.py
+**/migrations/*.py
