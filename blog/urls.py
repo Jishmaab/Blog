@@ -23,5 +23,6 @@ urlpatterns = [
     path('bio-update/', views.BioUpdateView.as_view(), name='bio-update'),
     path('likes/',views.LikeAPIView.as_view(), name='like-list'),
     path('likes/<int:pk>/', views.LikeAPIView.as_view(), name='like-detail'),
+    path('categories/', views.CategoryListView.as_view(), name='category-list')
 
 ] + router.urls

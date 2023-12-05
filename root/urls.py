@@ -10,8 +10,6 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/', include('blog.urls')),
     path('', index, name='index'),
-
-
 ]
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL,

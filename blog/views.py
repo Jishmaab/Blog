@@ -6,6 +6,7 @@ from django.contrib.auth import authenticate, update_session_auth_hash
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.core.validators import validate_email
+from django.db import IntegrityError
 from django.forms import ValidationError
 from django.http import HttpResponse
 from django.shortcuts import render
@@ -22,11 +23,13 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_api_key.permissions import HasAPIKey
 
-from permissions.permission import IsAdminOrReadOnly
+from permissions.permission import IsAdminOrReadOnly, IsAdminUser
+from root.viewsets import ModelViewSet
 from utils.custompassword import PasswordValidator
 from utils.exceptions import custom_exception_handler, fail, success
 
 from .models import Category, Comment, Like, Post, Tag, User
+from .pagination import DynamicPageSizePagination
 from .serializers import (BioUpdateSerializer, CategorySerializer,
                           ChangePasswordSerializer, CommentSerializer,
                           DraftPostSerializer, LikeSerializer, LoginSerializer,
@@ -106,7 +109,7 @@ class ChangePasswordAPIView(APIView):
         return Response(fail(serializer.errors))
 
 
-class CommentViewSet(viewsets.ModelViewSet):
+class CommentViewSet(ModelViewSet):
     queryset = Comment.objects.all()
     serializer_class = CommentSerializer
     permission_classes = [IsAuthenticated]
@@ -116,7 +119,7 @@ class CommentViewSet(viewsets.ModelViewSet):
         serializer.save(author=self.request.user)
 
 
-class PostViewSet(viewsets.ModelViewSet):
+class PostViewSet(ModelViewSet):
     queryset = Post.objects.all().order_by('-created_at')
     serializer_class = PostSerializer
     pagination_class = PageNumberPagination
@@ -136,6 +139,11 @@ class PostViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['patch'])
     def publish(self, request, pk=None):
         post = self.get_object()
+
+        if post.status == Post.StatusChoices.Published:
+
+            return Response(fail("Already posted"))
+
         post.status = Post.StatusChoices.Published
         post.save()
         return Response(success('Post published successfully'))
@@ -153,7 +161,7 @@ class PostViewSet(viewsets.ModelViewSet):
         return super().delete(request, *args, **kwargs)
 
 
-class UserViewSet(viewsets.ModelViewSet):
+class UserViewSet(ModelViewSet):
     queryset = User.objects.all()
     serializer_class = UserSerializer
     pagination_class = PageNumberPagination
@@ -170,18 +178,30 @@ class PostListView(generics.ListAPIView):
     permission_classes = [IsAuthenticated, HasAPIKey]
 
 
-class CategoryViewSet(viewsets.ModelViewSet):
+class CategoryViewSet(ModelViewSet):
     queryset = Category.objects.all()
     serializer_class = CategorySerializer
     pagination_class = PageNumberPagination
-    permission_classes = [IsAuthenticated, HasAPIKey]
+    permission_classes = [IsAuthenticated, IsAdminUser]
+
+    def create(self, request, *args, **kwargs):
+        if not self.request.user.is_staff:
+            return Response(fail("You do not have permission to create categories."))
+        return super().create(request, *args, **kwargs)
 
 
-class TagViewSet(viewsets.ModelViewSet):
+class CategoryListView(generics.ListAPIView):
+    queryset = Category.objects.all()
+    serializer_class = CategorySerializer
+    pagination_class = DynamicPageSizePagination
+    permission_classes = [IsAuthenticated]
+
+
+class TagViewSet(ModelViewSet):
     queryset = Tag.objects.all()
     serializer_class = TagSerializer
     pagination_class = PageNumberPagination
-    permission_classes = [IsAuthenticated, HasAPIKey]
+    permission_classes = [IsAuthenticated, IsAdminUser]
 
 
 class LikeAPIView(APIView):
@@ -204,10 +224,18 @@ class LikeAPIView(APIView):
     def post(self, request, *args, **kwargs):
         serializer = LikeSerializer(data=request.data)
         if serializer.is_valid():
-            serializer.save(author=request.user)
-            handle_like(request, serializer.instance.post.id)
-            return HttpResponse(success())
-        return Response(fail())
+            try:
+                serializer.save(author=request.user)
+                handle_like(request, serializer.instance.post.id)
+                return Response(success("Like created successfully"))
+            except IntegrityError as e:
+                if 'unique constraint' in str(e).lower():
+                    return Response(fail("Like already exists for this post."))
+                else:
+                    return Response(fail("Failed to create like."))
+        return Response(fail("Failed to validate input"))
+
+
 
     def delete(self, request, *args, **kwargs):
         like_id = kwargs.get('pk')
@@ -215,9 +243,9 @@ class LikeAPIView(APIView):
             like = Like.objects.get(id=like_id, author=request.user)
             post_id = like.post.id
             like.delete()
-            return HttpResponse(fail({'error':"deleted"}))
+            return Response(fail( "deleted"))
         except Like.DoesNotExist:
-            return HttpResponse(fail())
+            return Response(fail())
 
 
 def handle_like(request, post_id):
