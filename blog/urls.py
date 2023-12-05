@@ -12,17 +12,17 @@ router.register(r'tag', views.TagViewSet, basename='tag'),
 # router.register(r'likes', views.LikeViewSet, basename='like'),
 
 urlpatterns = [
-    path('signup/', views.SignupView.as_view(), name='signup'),
-    path('login/', views.LoginView.as_view(), name='login'),
-    path('logout/', views.LogoutView.as_view(), name='logout'),
-    path('change-password/', views.ChangePasswordAPIView.as_view(),
+    path('signup', views.SignupView.as_view(), name='signup'),
+    path('login', views.LoginView.as_view(), name='login'),
+    path('logout', views.LogoutView.as_view(), name='logout'),
+    path('change-password', views.ChangePasswordAPIView.as_view(),
          name='change-password'),
-    path('postlist/', views.PostListView.as_view(), name='post-list'),
-    path('userprofile/<int:user_id>/',
+    path('postlist', views.PostListView.as_view(), name='post-list'),
+    path('userprofile/<int:user_id>',
          views.UserProfileAPIView.as_view(), name='user-profile'),
-    path('bio-update/', views.BioUpdateView.as_view(), name='bio-update'),
-    path('likes/',views.LikeAPIView.as_view(), name='like-list'),
-    path('likes/<int:pk>/', views.LikeAPIView.as_view(), name='like-detail'),
-    path('categories/', views.CategoryListView.as_view(), name='category-list')
+    path('bio-update', views.BioUpdateView.as_view(), name='bio-update'),
+    path('likes',views.LikeAPIView.as_view(), name='like-list'),
+    path('likes/<int:pk>', views.LikeAPIView.as_view(), name='like-detail'),
+    path('categories', views.CategoryListView.as_view(), name='category-list')
 
 ] + router.urls

@@ -176,6 +176,7 @@ class PostListView(generics.ListAPIView):
     ordering_fields = ['created_at', 'category', 'author']
     pagination_class = PageNumberPagination
     permission_classes = [IsAuthenticated, HasAPIKey]
+    
 
 
 class CategoryViewSet(ModelViewSet):

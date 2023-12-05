@@ -5,7 +5,8 @@ from blog.models import User
 
 class IsAdminUser(permissions.BasePermission):
     def has_permission(self, request, view):
-        return request.user.user_type == User.UserChoices.Admin
+                return request.user.user_type == User.UserChoices.Admin or request.user.is_staff
+
 
 
 class IsPostOwner(permissions.BasePermission):
