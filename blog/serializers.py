@@ -24,7 +24,6 @@ class UserSerializer(serializers.ModelSerializer):
         extra_kwargs = {'password': {'write_only': True}}
 
     def create(self, validated_data):
-        # Check if 'bio' and 'profile_picture' keys exist before passing them
         user = User.objects.create_user(
             username=validated_data.get('username'),
             email=validated_data.get('email'),
