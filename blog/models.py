@@ -8,8 +8,8 @@ class User(AbstractUser):
         User = 1, 'User'
     user_type = models.IntegerField(choices=UserChoices.choices, default=1)
     profile_picture = models.ImageField(
-        upload_to='profile_pictures/', null=True, blank=True)
-    bio = models.TextField()
+    upload_to='profile_pictures/', null=True, blank=True)
+    bio = models.TextField(null=True,blank=True)
 
     def __str__(self) -> str: return self.username
 

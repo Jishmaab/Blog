@@ -4,9 +4,8 @@ from utils.custompassword import PasswordField
 
 from .models import *
 
-
 class UserSerializer(serializers.ModelSerializer):
-    profile_picture = serializers.FileField()
+    profile_picture = serializers.FileField(required=False)
     password = PasswordField(write_only=True, required=True)
     published_posts = serializers.SerializerMethodField()
 
@@ -25,16 +24,18 @@ class UserSerializer(serializers.ModelSerializer):
         extra_kwargs = {'password': {'write_only': True}}
 
     def create(self, validated_data):
+        # Check if 'bio' and 'profile_picture' keys exist before passing them
         user = User.objects.create_user(
             username=validated_data.get('username'),
             email=validated_data.get('email'),
             first_name=validated_data.get('first_name'),
             last_name=validated_data.get('last_name'),
-            profile_picture=validated_data.get('profile_picture'),
+            password=validated_data.get('password'),
             bio=validated_data.get('bio'),
-            password=validated_data.get('password')
+            profile_picture=validated_data.get('profile_picture')
         )
         return user
+
 
     def get_published_posts(self, user):
         posts = Post.objects.filter(
