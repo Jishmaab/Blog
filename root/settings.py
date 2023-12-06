@@ -58,8 +58,8 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
-    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.common.CommonMiddleware',
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
@@ -74,7 +74,7 @@ CORS_ALLOWED_ORIGINS = [
 ]
 
 from corsheaders.defaults import default_headers
-CORS_ALLOW_HEADERS:[*default_headers,'x-api-key']
+CORS_ALLOW_HEADERS = [*default_headers,'x-api-key']
 
 ROOT_URLCONF = 'root.urls'
 
@@ -185,7 +185,9 @@ REST_FRAMEWORK = {
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 10,
     'DEFAULT_AUTHENTICATION_CLASSES': [
-        'root.modules.authentication.ExpiringTokenAuthentication'],
+        'root.modules.authentication.ExpiringTokenAuthentication',
+        # 'blog.authentication.CustomApiKeyAuthentication',],
+    ],
     'DEFAULT_FILTER_BACKENDS': ['rest_framework.filters.SearchFilter'],
     'SEARCH_PARAM': 'search_param',
     'DEFAULT_VERSIONING_CLASS': 'rest_framework.versioning.AcceptHeaderVersioning',

@@ -6,10 +6,11 @@ from django.utils.crypto import get_random_string
 from rest_framework import status
 from rest_framework.authtoken.models import Token
 from rest_framework.reverse import reverse
-from rest_framework.test import (APIRequestFactory, APITestCase,
-                                 force_authenticate)
+from rest_framework.test import (APIRequestFactory, APITestCase)
+from blog.management.commands import api_key_gen
 
-from blog.models import Comment, Post, Tag, User
+from blog.models import Category, Comment, Post, Tag, User
+from root.settings import API_KEY_CUSTOM_HEADER
 
 
 class SignupViewTestCase(APITestCase):
@@ -26,21 +27,24 @@ class SignupViewTestCase(APITestCase):
         )
 
     def test_signup_successful(self):
-        url = '/api/signup/'
+        url = reverse('signup')
         data = {
-            'username': 'newuser',
-            'email': 'newuser@example.com',
+            'username': 'dom',
+            'email': 'dom00@example.com',
             'password': 'Password@123',
-            'first_name': 'firstname',
-            'last_name': 'lastname',
+            'first_name': 'dom',
+            'last_name': 'george',
             'user_type': 1,
             'profile_picture': self.generate_image_file(),
             'bio': 'bio'
         }
 
-        response = self.client.post(url, data, format='multipart')
-        # print(response.content)
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        response = self.client.post(
+            url, data, format='multipart', **{'x-api-key': 'eNR3fmpc.NwaQnP8j1vTB1lCpzNtIru4lPn0FhF2I'}
+        )
+        print(response.request)
+        print(response.headers)
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(response.data['status'], True)
 
     def generate_image_file(self):
@@ -423,3 +427,170 @@ class TagViewSetTestCase(APIRequestFactory):
         self.client.force_authenticate(user=self.user)
         response = self.client.get(self.url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+
+class PostViewSetTest(APIRequestFactory):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username='testuser', password='testpassword'
+        )
+        self.client.force_authenticate(user=self.user)
+
+    def test_create_post(self):
+        url = '/api/posts/'
+        data = {'title': 'Test Post', 'content': 'This is a test post.'}
+
+        response = self.client.post(url, data, format='json')
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(Post.objects.count(), 1)
+        self.assertEqual(Post.objects.get().title, 'Test Post')
+
+    def test_publish_post(self):
+        post = Post.objects.create(
+            title='Draft Post', content='This is a draft post.', author=self.user
+        )
+
+        url = f'/api/posts/{post.id}/publish/'
+        response = self.client.patch(url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(Post.objects.get().status,
+                         Post.StatusChoices.Published)
+
+    def test_archive_post(self):
+        post = Post.objects.create(
+            title='Published Post',
+            content='This is a published post.',
+            author=self.user,
+            status=Post.StatusChoices.Published,
+        )
+
+        url = f'/api/posts/{post.id}/'
+        response = self.client.delete(url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(Post.objects.get().status, Post.StatusChoices.Draft)
+
+
+class PostListViewTest(APIRequestFactory):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username='testuser', password='testpassword'
+        )
+        self.api_key, _ = api_key_gen.objects.create_key(name="test_api_key")
+        self.client.credentials(HTTP_X_API_KEY=self.api_key)
+
+        # Create some test data (categories, posts, etc.)
+        self.category = Category.objects.create(name='Test Category')
+        self.post1 = Post.objects.create(
+            title='Post 1',
+            content='This is post 1 content.',
+            author=self.user,
+            category=self.category,
+        )
+        self.post2 = Post.objects.create(
+            title='Post 2',
+            content='This is post 2 content.',
+            author=self.user,
+            category=self.category,
+        )
+
+    def test_list_posts(self):
+        url = '/api/postlist/'
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        # Assuming two posts in the test data
+        self.assertEqual(len(response.data['results']), 2)
+
+    def test_search_posts(self):
+        url = '/api/postlist/'
+        response = self.client.get(url, {'search_param': 'Post 1'})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data['results']), 1)
+        self.assertEqual(response.data['results'][0]['title'], 'Post 1')
+
+    def test_order_posts(self):
+        url = '/api/postlist/'
+        response = self.client.get(url, {'ordering': 'created_at'})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data['results']), 2)
+
+
+class CategoryViewSetTest(APIRequestFactory):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username='adminuser', password='adminpassword', is_staff=True
+        )
+        self.api_key, _ = API_KEY_CUSTOM_HEADER.objects.create_key(
+            name="test_api_key")
+        self.client.credentials(HTTP_X_API_KEY=self.api_key)
+
+    def test_create_category(self):
+        url = '/api/categories/'
+        data = {'name': 'Test Category'}
+
+        # Ensure only admin users can create categories
+        response = self.client.post(url, data)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+        # Log in as an admin user and try again
+        self.client.login(username='adminuser', password='adminpassword')
+        response = self.client.post(url, data)
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data['name'], 'Test Category')
+
+
+class LikeAPIViewTest(APIRequestFactory):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username='testuser', password='testpassword'
+        )
+        self.post = Post.objects.create(
+            title='Test Post', content='Test Content', author=self.user)
+
+    def test_like_post(self):
+        url = reverse('like-list')  # Adjust the URL based on your URL patterns
+        data = {'post': self.post.id}
+
+        # Ensure unauthorized user cannot like a post
+        response = self.client.post(url, data)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+        # Log in and try again
+        self.client.force_authenticate(user=self.user)
+        response = self.client.post(url, data)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['message'], 'success')
+        self.assertEqual(response.data['data']['author'], self.user.id)
+        self.assertEqual(response.data['data']['post'], self.post.id)
+
+
+class UserProfileAPIViewTest(APIRequestFactory):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username='testuser', password='testpassword'
+        )
+
+    def test_get_user_profile(self):
+        # Adjust the URL based on your URL patterns
+        url = reverse('user-profile', args=[self.user.id])
+
+        # Ensure unauthorized user can access user profile
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['username'], self.user.username)
+
+    def test_get_nonexistent_user_profile(self):
+        non_existent_user_id = 999  # Assuming this user ID does not exist
+        url = reverse('user-profile', args=[non_existent_user_id])
+
+        # Ensure getting a profile for a non-existent user returns a 'User not found' message
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertEqual(response.data['error'], 'User not found')
